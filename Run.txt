@@ -1,0 +1,179 @@
+
+#---Run code api rest full 
+
+composer global require laravel/installer // se debe elijir la opción 1[none]  Would you like to install a starter kit? [No starter kit]:
+  [none     ] No starter kit
+  [breeze   ] Laravel Breeze
+  [jetstream] Laravel Jetstream posterior a Which testing framework do you prefer? [PHPUnit]:
+[0] PHPUnit
+[1] Pestphpunit
+navegar hasta raiz y usar cp .env.example .env
+
+gen key php artisan key:generate
+php artisan serve para correr tu proyecto general ruta y port http://127.0.0.1:8000/
+
+php artisan make:controller VideoController //controller videos
+composer require sohagsrz/fbmediadownloader //libreria de fbmediadownloader download puded tomar un tiempo
+
+
+configure db mysql en .env 
+tabla de mysql 
+CREATE TABLE user_api_keys (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name_key VARCHAR(64) NOT NULL,               -- Nombre de la clave creada
+    api_key VARCHAR(64) NOT NULL UNIQUE,         -- Clave única (Bearer Token)
+    credits INT NOT NULL,                        -- Número de créditos disponibles
+    expiration TIMESTAMP NULL,                   -- Fecha de expiración de la autorización
+    email VARCHAR(255) NOT NULL,                 -- Correo del usuario
+    status ENUM('active', 'inactive', 'vencido', 'suspendido', 'eliminado') DEFAULT 'active', -- Estado de la cuenta
+    ip_address VARCHAR(45) DEFAULT '0.0.0.0',    -- IP permitida (IPv4 o IPv6)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Fecha de creación del registro
+);
+
+CREATE TABLE api_usage_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_api_key_id INT NOT NULL,                -- Relación con la tabla user_api_keys (clave foránea)
+    name_key VARCHAR(64) NOT NULL,               -- Nombre de la clave relacionada con user_api_keys
+    endpoint VARCHAR(255) NOT NULL,              -- El endpoint al que se accedió
+    endpointFB INT DEFAULT 0,                    -- Uso en endpoint de Facebook
+    endpointYT INT DEFAULT 0,                    -- Uso en endpoint de YouTube
+    endpointIG INT DEFAULT 0,                    -- Uso en endpoint de Instagram
+    fail_use INT DEFAULT 0,                      -- Número de fallos
+    success_use INT DEFAULT 0,                   -- Número de éxitos
+    ip_address VARCHAR(45) NOT NULL,             -- Dirección IP desde donde se hizo la solicitud
+    created_log TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Fecha de la primera solicitud
+    last_use TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- Último uso de la API
+    FOREIGN KEY (user_api_key_id) REFERENCES user_api_keys(id) -- Relación con user_api_keys
+);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateUserApiKeysTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('user_api_keys', function (Blueprint $table) {
+            $table->id();  // id INT AUTO_INCREMENT PRIMARY KEY
+            $table->string('name_key', 64);  // Nombre de la clave API
+            $table->string('api_key', 64)->unique();  // Bearer Token único
+            $table->integer('credits');  // Créditos disponibles
+            $table->timestamp('expiration')->nullable();  // Fecha de expiración de la clave
+            $table->string('email')->unique();  // Correo electrónico único
+            $table->enum('status', ['active', 'inactive', 'vencido', 'suspendido', 'eliminado'])->default('active');  // Estado de la clave
+            $table->string('ip_address', 45)->default('0.0.0.0');  // IP permitida
+            $table->timestamps();  // created_at y updated_at
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('user_api_keys');
+    }
+}
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateApiUsageLogsTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('api_usage_logs', function (Blueprint $table) {
+            $table->id();  // id INT AUTO_INCREMENT PRIMARY KEY
+            $table->foreignId('user_api_key_id')->constrained('user_api_keys');  // Relación con user_api_keys
+            $table->string('name_key', 64);  // Clave API usada
+            $table->string('endpoint', 255);  // Endpoint al que se accedió
+            $table->integer('endpointFB')->default(0);  // Uso en Facebook
+            $table->integer('endpointYT')->default(0);  // Uso en YouTube
+            $table->integer('endpointIG')->default(0);  // Uso en Instagram
+            $table->integer('fail_use')->default(0);  // Número de fallos
+            $table->integer('success_use')->default(0);  // Número de éxitos
+            $table->string('ip_address', 45);  // Dirección IP de la solicitud
+            $table->timestamp('created_log')->useCurrent();  // Primer uso de la clave
+            $table->timestamp('last_use')->useCurrent()->nullable();  // Último uso de la clave
+            $table->timestamps();  // created_at y updated_at
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('api_usage_logs');
+    }
+}
+php artisan make:migration create_user_api_keys_table // pegar contenido dentro y save
+php artisan make:migration create_api_usage_logs_table
+
+
+
+
+php artisan make:model UserApiKey// modelo
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class UserApiKey extends Model
+{
+    use HasFactory;
+
+    protected $table = 'user_api_keys';
+
+    protected $fillable = [
+        'name_key', 
+        'api_key', 
+        'credits', 
+        'expiration', 
+        'email', 
+        'status', 
+        'ip_address'
+    ];
+
+    // Relación: Un usuario puede tener muchos logs de uso
+    public function apiUsageLogs()
+    {
+        return $this->hasMany(ApiUsageLog::class, 'user_api_key_id');
+    }
+}
+
+
+php artisan make:model ApiUsageLog
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class ApiUsageLog extends Model
+{
+    use HasFactory;
+
+    protected $table = 'api_usage_logs';
+
+    protected $fillable = [
+        'user_api_key_id', 
+        'name_key', 
+        'endpoint', 
+        'endpointFB', 
+        'endpointYT', 
+        'endpointIG', 
+        'fail_use', 
+        'success_use', 
+        'ip_address', 
+        'created_log', 
+        'last_use'
+    ];
+
+    // Relación: Un log pertenece a un usuario
+    public function userApiKey()
+    {
+        return $this->belongsTo(UserApiKey::class, 'user_api_key_id');
+    }
+}
+
+
+php artisan migrate// ejecutara todo tablas
+
+php artisan make:controller FacebookDownloader// codigo
